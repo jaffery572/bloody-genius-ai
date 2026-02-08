@@ -1,256 +1,245 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import numpy as np
-import time
-import random
+import uuid
+from datetime import datetime, timedelta
+import json
 
-# ==================== PAGE CONFIG ====================
+# -----------------------------------------------------------------------------
+# CONFIGURATION & STYLE
+# -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Counter-Drone Commander",
-    page_icon="🚁",
-    layout="wide"
+    page_title="Entropia | Thermodynamic Knowledge",
+    page_icon="⚛️",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ==================== SIMPLE CSS ====================
+# Custom CSS to enhance the "Lab" feel
 st.markdown("""
 <style>
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
     .metric-card {
-        background: #0a0a0a;
-        padding: 20px;
+        background-color: #262730;
+        padding: 15px;
         border-radius: 10px;
-        border: 2px solid #00ff00;
+        border: 1px solid #41424b;
         text-align: center;
-        margin: 10px;
     }
-    .metric-value {
-        color: #00ff00;
-        font-size: 36px;
-        font-weight: bold;
-    }
-    .metric-label {
-        color: #00ff00;
-        font-size: 14px;
+    h1, h2, h3 {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 300;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== SESSION STATE ====================
-if 'simulation_state' not in st.session_state:
-    st.session_state.simulation_state = {
-        'active': False,
-        'time': 0,
-        'score': 0,
-        'threats': 0,
-        'neutralized': 0,
-        'breaches': 0,
-        'radar': 85,
-        'budget': 1000000
-    }
+# -----------------------------------------------------------------------------
+# THE PHYSICS ENGINE (LOGIC)
+# -----------------------------------------------------------------------------
 
-# ==================== SIDEBAR ====================
-with st.sidebar:
-    st.title("⚙️ COMMAND CONSOLE")
+def init_state():
+    """Initialize the session state with a 'Big Bang' if empty."""
+    if 'particles' not in st.session_state:
+        # Seed with some initial matter so the universe isn't empty
+        st.session_state['particles'] = [
+            {
+                'id': str(uuid.uuid4()),
+                'content': 'The universe tends toward disorder.',
+                'created_at': datetime.now() - timedelta(hours=5),
+                'mass': 1, # Generation 1
+                'source': 'Big Bang'
+            },
+            {
+                'id': str(uuid.uuid4()),
+                'content': 'Knowledge requires active energy to maintain.',
+                'created_at': datetime.now() - timedelta(hours=2),
+                'mass': 1, 
+                'source': 'Big Bang'
+            }
+        ]
+
+def calculate_thermodynamics(decay_rate):
+    """
+    Apply the Second Law: Entropy increases with time.
+    Returns a DataFrame enriched with thermodynamic properties.
+    """
+    if not st.session_state['particles']:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(st.session_state['particles'])
     
-    # Status
-    status = "🟢 ONLINE" if st.session_state.simulation_state['active'] else "🔴 OFFLINE"
-    st.markdown(f"**Status:** {status}")
+    # Time delta in hours
+    now = datetime.now()
+    df['age_hours'] = df['created_at'].apply(lambda x: (now - x).total_seconds() / 3600)
     
-    # Controls
-    col1, col2 = st.columns(2)
+    # Entropy Equation: E = k * time * (1 / mass)
+    # Heavier particles (synthesized ideas) decay slower.
+    df['entropy'] = df['age_hours'] * decay_rate * (1 / df['mass'])
+    
+    # Cap entropy at 100 for visualization sanity
+    df['entropy'] = df['entropy'].clip(upper=100)
+    
+    return df
+
+def synthesize_particles(id_a, id_b, new_insight):
+    """
+    Merge two particles into a new, heavier one. 
+    Reduces system entropy locally.
+    """
+    particles = st.session_state['particles']
+    
+    # Find parents
+    p_a = next(p for p in particles if p['id'] == id_a)
+    p_b = next(p for p in particles if p['id'] == id_b)
+    
+    # Remove parents (Law of Conservation: Matter transforms)
+    st.session_state['particles'] = [p for p in particles if p['id'] not in [id_a, id_b]]
+    
+    # Create new particle
+    new_mass = p_a['mass'] + p_b['mass']
+    new_particle = {
+        'id': str(uuid.uuid4()),
+        'content': new_insight,
+        'created_at': datetime.now(), # Fresh creation = 0 Entropy
+        'mass': new_mass,
+        'source': 'Synthesis'
+    }
+    
+    st.session_state['particles'].append(new_particle)
+    return new_mass
+
+# -----------------------------------------------------------------------------
+# UI LAYOUT
+# -----------------------------------------------------------------------------
+
+def main():
+    init_state()
+    
+    # -- Sidebar: Lab Controls --
+    with st.sidebar:
+        st.title("⚛️ Entropia")
+        st.markdown("### The Thermodynamic Knowledge Engine")
+        st.info("Ideas decay into noise (Entropy) unless you combine them into insight (Synthesis).")
+        
+        st.markdown("---")
+        st.subheader("1. Inject Matter")
+        new_thought = st.text_area("New Observation/Idea", height=100, placeholder="E.g., Chaos is a ladder...")
+        if st.button("Inject into System", type="primary"):
+            if new_thought.strip():
+                st.session_state['particles'].append({
+                    'id': str(uuid.uuid4()),
+                    'content': new_thought,
+                    'created_at': datetime.now(),
+                    'mass': 1,
+                    'source': 'User Injection'
+                })
+                st.rerun()
+            else:
+                st.error("Matter cannot be created from void (empty input).")
+        
+        st.markdown("---")
+        st.subheader("Lab Settings")
+        decay_rate = st.slider("Universal Decay Constant (k)", 1.0, 20.0, 5.0, help="Higher values make ideas rot faster.")
+        
+        # Data Persistence (Human-Realistic feature)
+        st.markdown("---")
+        st.subheader("Backup Universe")
+        if st.session_state['particles']:
+            json_data = json.dumps(st.session_state['particles'], default=str, indent=2)
+            st.download_button("Export State JSON", json_data, "entropia_universe.json", "application/json")
+
+    # -- Main: The Macroscope --
+    
+    # 1. Calculate Physics
+    df = calculate_thermodynamics(decay_rate)
+    
+    if df.empty:
+        st.warning("The universe is empty. Inject matter via the sidebar.")
+        return
+
+    # 2. Header & Metrics
+    col1, col2, col3 = st.columns(3)
+    avg_entropy = df['entropy'].mean()
+    total_mass = df['mass'].sum()
+    
     with col1:
-        if st.button("▶️ Start", use_container_width=True):
-            st.session_state.simulation_state['active'] = True
-            st.rerun()
+        st.metric("System Entropy (Chaos)", f"{avg_entropy:.1f}", delta=f"{-avg_entropy/10:.1f}", delta_color="inverse")
     with col2:
-        if st.button("⏸️ Pause", use_container_width=True):
-            st.session_state.simulation_state['active'] = False
-            st.rerun()
+        st.metric("System Mass (Knowledge)", f"{total_mass}", delta="Stable")
+    with col3:
+        system_temp = "🔥 Critical" if avg_entropy > 75 else "❄️ Stable" if avg_entropy < 25 else "⚠️ Warming"
+        st.metric("System Status", system_temp)
+
+    # 3. Visualization (The Einstein Twist)
+    st.markdown("### 🔭 The Phase Space")
     
-    # Scenarios
-    st.markdown("---")
-    st.subheader("🎯 SCENARIOS")
-    
-    scenario = st.selectbox(
-        "Choose Scenario",
-        ["Peacetime Patrol", "Airport Defense", "Swarm Attack", "Critical Infrastructure"]
+    # Scatter plot: X=Age, Y=Entropy. 
+    # Logic: High Entropy items float to the top and turn red.
+    fig = px.scatter(
+        df, 
+        x='age_hours', 
+        y='entropy', 
+        size='mass', 
+        color='entropy',
+        hover_data=['content', 'source'],
+        color_continuous_scale=['#00cc96', '#ef553b'], # Green to Red
+        range_y=[0, 110],
+        title="Particle Decay Trajectory",
+        labels={'age_hours': 'Time Since Creation (Hours)', 'entropy': 'Entropy (Disorder Level)'}
     )
     
-    if st.button("🚀 Deploy Scenario", use_container_width=True):
-        # Generate threats based on scenario
-        threats = random.randint(1, 10) if scenario == "Swarm Attack" else random.randint(1, 5)
-        st.session_state.simulation_state['threats'] = threats
-        st.session_state.simulation_state['active'] = True
-        st.success(f"Scenario '{scenario}' deployed with {threats} threats")
-        st.rerun()
+    fig.update_layout(
+        plot_bgcolor='#0e1117',
+        paper_bgcolor='#0e1117',
+        font=dict(color='#fafafa'),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor='#262730')
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 4. The Collider (Action Zone)
+    st.markdown("### ⚡ The Hadron Collider (Synthesis)")
+    st.markdown("Select two high-entropy particles to collide. Merging them creates a massive, stable insight.")
+
+    # Create a dictionary for the multiselect to show readable names
+    options = {f"{row['content'][:50]}... (Entropy: {row['entropy']:.1f})": row['id'] for index, row in df.iterrows()}
     
-    # Countermeasures
-    st.markdown("---")
-    st.subheader("⚡ COUNTERMEASURES")
-    
-    if st.button("📡 RF Jamming", use_container_width=True):
-        if st.session_state.simulation_state['threats'] > 0:
-            neutralized = min(random.randint(1, 3), st.session_state.simulation_state['threats'])
-            st.session_state.simulation_state['threats'] -= neutralized
-            st.session_state.simulation_state['neutralized'] += neutralized
-            st.session_state.simulation_state['score'] += neutralized * 100
-            st.session_state.simulation_state['budget'] -= 50000
-            st.success(f"Neutralized {neutralized} threats with RF Jamming")
-            st.rerun()
-    
-    if st.button("🎯 Laser Defense", use_container_width=True):
-        if st.session_state.simulation_state['threats'] > 0:
-            neutralized = min(random.randint(1, 2), st.session_state.simulation_state['threats'])
-            st.session_state.simulation_state['threats'] -= neutralized
-            st.session_state.simulation_state['neutralized'] += neutralized
-            st.session_state.simulation_state['score'] += neutralized * 150
-            st.session_state.simulation_state['budget'] -= 300000
-            st.success(f"Neutralized {neutralized} threats with Laser Defense")
-            st.rerun()
-    
-    if st.button("🛡️ Hard-Kill", use_container_width=True):
-        if st.session_state.simulation_state['threats'] > 0:
-            neutralized = min(random.randint(1, 3), st.session_state.simulation_state['threats'])
-            st.session_state.simulation_state['threats'] -= neutralized
-            st.session_state.simulation_state['neutralized'] += neutralized
-            st.session_state.simulation_state['score'] += neutralized * 200
-            st.session_state.simulation_state['budget'] -= 500000
-            st.success(f"Neutralized {neutralized} threats with Hard-Kill")
-            st.rerun()
-    
-    # Reset
-    if st.button("🔄 Reset Simulation", use_container_width=True, type="secondary"):
-        st.session_state.simulation_state = {
-            'active': False,
-            'time': 0,
-            'score': 0,
-            'threats': 0,
-            'neutralized': 0,
-            'breaches': 0,
-            'radar': 85,
-            'budget': 1000000
-        }
-        st.rerun()
+    selected_labels = st.multiselect(
+        "Select 2 Particles to Collide:", 
+        options=list(options.keys()),
+        max_selections=2
+    )
 
-# ==================== MAIN DASHBOARD ====================
-st.title("🛡️ COUNTER-DRONE COMMANDER")
-st.markdown("---")
+    if len(selected_labels) == 2:
+        id_a = options[selected_labels[0]]
+        id_b = options[selected_labels[1]]
+        
+        # Retrieve full content for context
+        content_a = next(p['content'] for p in st.session_state['particles'] if p['id'] == id_a)
+        content_b = next(p['content'] for p in st.session_state['particles'] if p['id'] == id_b)
+        
+        st.info(f"**Particle A:** {content_a}")
+        st.info(f"**Particle B:** {content_b}")
+        
+        with st.form("synthesis_form"):
+            insight = st.text_area("Synthesized Insight (What connects these two?)", placeholder="The connection is...")
+            submitted = st.form_submit_button("💥 COLLIDE & SYNTHESIZE")
+            
+            if submitted and insight.strip():
+                new_mass = synthesize_particles(id_a, id_b, insight)
+                st.toast(f"Success! Created Generation {new_mass} Insight!", icon="⚛️")
+                st.rerun()
 
-# Top Metrics
-col1, col2, col3, col4 = st.columns(4)
+    # 5. The Ledger (Data View)
+    with st.expander("📂 View Particle Ledger"):
+        st.dataframe(
+            df[['content', 'mass', 'entropy', 'age_hours', 'source']].sort_values(by='entropy', ascending=False),
+            use_container_width=True
+        )
 
-with col1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{st.session_state.simulation_state['threats']}</div>
-        <div class="metric-label">ACTIVE THREATS</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{st.session_state.simulation_state['neutralized']}</div>
-        <div class="metric-label">NEUTRALIZED</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{st.session_state.simulation_state['breaches']}</div>
-        <div class="metric-label">BREACHES</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col4:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{st.session_state.simulation_state['score']}</div>
-        <div class="metric-label">SCORE</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Charts and Data
-st.markdown("---")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("📊 SYSTEM STATUS")
-    
-    # Radar Coverage
-    st.markdown(f"**Radar Coverage:** {st.session_state.simulation_state['radar']}%")
-    st.progress(st.session_state.simulation_state['radar'] / 100)
-    
-    # Budget
-    st.markdown(f"**Budget:** ${st.session_state.simulation_state['budget']:,}")
-    budget_percent = max(0, min(100, st.session_state.simulation_state['budget'] / 1000000 * 100))
-    st.progress(budget_percent / 100)
-    
-    # Time
-    st.markdown(f"**Simulation Time:** {st.session_state.simulation_state['time']}s")
-
-with col2:
-    st.subheader("📈 THREAT DISTRIBUTION")
-    
-    # Create a simple chart
-    threat_data = pd.DataFrame({
-        'Threat Type': ['Shahed-136', 'DJI Mavic', 'Orlan-10', 'Others'],
-        'Count': [random.randint(1, 5), random.randint(1, 5), random.randint(1, 5), random.randint(1, 5)]
-    })
-    st.bar_chart(threat_data.set_index('Threat Type'))
-
-# Console Log
-st.markdown("---")
-st.subheader("📟 COMMAND CONSOLE")
-
-# Create console
-console_text = ""
-if st.session_state.simulation_state['active']:
-    console_text += f"[{st.session_state.simulation_state['time']}s] System: Simulation ACTIVE\n"
-    
-if st.session_state.simulation_state['threats'] > 0:
-    console_text += f"[{st.session_state.simulation_state['time']}s] Alert: {st.session_state.simulation_state['threats']} threats detected\n"
-    
-if st.session_state.simulation_state['neutralized'] > 0:
-    console_text += f"[{st.session_state.simulation_state['time']}s] Success: {st.session_state.simulation_state['neutralized']} threats neutralized\n"
-    
-if st.session_state.simulation_state['breaches'] > 0:
-    console_text += f"[{st.session_state.simulation_state['time']}s] WARNING: {st.session_state.simulation_state['breaches']} breaches detected\n"
-
-console_text += f"[{st.session_state.simulation_state['time']}s] Status: {'SIMULATION RUNNING' if st.session_state.simulation_state['active'] else 'SIMULATION PAUSED'}"
-
-st.code(console_text, language='bash')
-
-# Drone Database
-st.markdown("---")
-st.subheader("📋 DRONE DATABASE")
-
-drone_data = pd.DataFrame({
-    'Drone': ['Shahed-136', 'DJI Mavic 3', 'Orlan-10', 'Switchblade 300', 'Cargo Smuggler'],
-    'Type': ['Loitering Munition', 'Commercial Quadcopter', 'Recon UAV', 'Kamikaze Drone', 'Modified Commercial'],
-    'Speed (km/h)': [185, 72, 150, 160, 60],
-    'Range (km)': [2500, 30, 600, 10, 40],
-    'Threat Level': ['CRITICAL', 'MEDIUM', 'HIGH', 'CRITICAL', 'HIGH']
-})
-
-st.dataframe(drone_data, use_container_width=True)
-
-# Simulation Logic
-if st.session_state.simulation_state['active']:
-    # Increment time
-    st.session_state.simulation_state['time'] += 1
-    
-    # Occasionally add new threats
-    if random.random() < 0.1:
-        new_threats = random.randint(0, 2)
-        st.session_state.simulation_state['threats'] += new_threats
-        if new_threats > 0:
-            st.session_state.simulation_state['breaches'] += 1
-    
-    # Auto-refresh
-    time.sleep(1)
-    st.rerun()
-
-# Footer
-st.markdown("---")
-st.markdown("*Counter-Drone Commander Simulator v1.0 | Ready for Deployment*")
+if __name__ == "__main__":
+    main()
