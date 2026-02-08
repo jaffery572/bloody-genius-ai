@@ -436,7 +436,7 @@ if 'simulation_state' not in st.session_state:
         'score': 0,
         'assets_protected': 100,
         'radar_coverage': 85,
-        'current_scenario': 'PEACETIME',
+        'current_scenario': 'PEACETIME PATROL',
         'console_log': [],
         'budget_remaining': 1000000,
         'interceptions': 0,
@@ -655,13 +655,30 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
     
-    # Scenario Selection
+    # Scenario Selection - FIXED ERROR HERE
     with st.expander("🎯 TRAINING SCENARIOS", expanded=True):
         scenarios = ["PEACETIME PATROL", "AIRPORT BREACH", "SHAHED SWARM", "CRITICAL INFRASTRUCTURE"]
+        
+        # Get current scenario
+        current_scenario = st.session_state.simulation_state['current_scenario']
+        
+        # Make sure current scenario is in the list
+        if current_scenario not in scenarios:
+            # Reset to first scenario if not found
+            st.session_state.simulation_state['current_scenario'] = scenarios[0]
+            current_scenario = scenarios[0]
+        
+        # Find index safely
+        try:
+            scenario_index = scenarios.index(current_scenario)
+        except ValueError:
+            scenario_index = 0
+            st.session_state.simulation_state['current_scenario'] = scenarios[0]
+        
         selected_scenario = st.selectbox(
             "Select Scenario",
             scenarios,
-            index=scenarios.index(st.session_state.simulation_state['current_scenario'])
+            index=scenario_index
         )
         
         if st.button("🚀 DEPLOY SCENARIO", use_container_width=True):
@@ -715,7 +732,7 @@ with st.sidebar:
                     'score': 0,
                     'assets_protected': 100,
                     'radar_coverage': 85,
-                    'current_scenario': 'PEACETIME',
+                    'current_scenario': 'PEACETIME PATROL',
                     'console_log': [],
                     'budget_remaining': 1000000,
                     'interceptions': 0,
