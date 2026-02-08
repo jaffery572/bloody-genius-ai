@@ -1,5 +1,5 @@
-streamlit==1.29.0
-pandas==2.1.4
-numpy==1.24.3
-plotly==5.18.0
-pydeck==0.9.1
+echo "streamlit==1.29.0" > requirements.txt
+echo "pandas==2.1.4" >> requirements.txt
+echo "numpy==1.24.3" >> requirements.txt
+echo "plotly==5.18.0" >> requirements.txt
+echo "pydeck==0.9.1" >> requirements.txt
